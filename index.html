@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>WasteWise — BBMP Bengaluru</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800;900&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+<!-- Early stubs: make all onclick-used functions available immediately,
+     before the main deferred script at bottom of body is parsed -->
+<script>
+// These will be overwritten by the real implementations below,
+// but defining them here prevents "X is not defined" if browser
+// fires a click before the main script block is fully parsed.
+['setView','setMobileTab','setDeskPage','camOpen','camClose','camFlip',
+ 'camCapture','galHandle','runDemo','changeQty','switchTab','switchTab2',
+ 'scanReset','renderMyWard','selectWard'].forEach(function(fn){
+  window[fn]=window[fn]||function(){
+    // queue call — will be replayed once real script loads
+    (window.__q=window.__q||[]).push([fn,Array.from(arguments)]);
+  };
+});
+</script>
+<div id="shell">
+
+<!-- ════ GLOBAL TOPBAR ════ -->
+<div id="global-topbar">
+  <div class="logo-wrap">
+    <div class="logo-icon">♻️</div>
+    <div>
+      <div class="logo-name">WasteWise</div>
+      <div class="logo-sub">BBMP · Bengaluru</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:7px;margin-left:10px">
+    <div class="live-dot"></div>
+    <span style="font-size:11px;font-weight:700;color:var(--accent);font-family:var(--mono)">LIVE</span>
+  </div>
+  <span id="clock-el"></span>
+  <div class="view-toggle">
+    <button class="vtbtn active" id="vt-citizen" onclick="setView('citizen')">👤 Citizen</button>
+    <button class="vtbtn" id="vt-authority" onclick="setView('authority')">🏛️ Authority</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════
+     MOBILE CITIZEN APP
+════════════════════════════════════ -->
+<div id="mobile-app" style="position:relative;overflow:hidden">
+  <div id="mobile-content">
+
+    <!-- SCANNER PAGE -->
+    <div class="m-page active" id="mp-scanner">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+        <div style="width:40px;height:40px;border-radius:11px;background:var(--accentGlow);border:1px solid rgba(0,230,118,.2);display:flex;align-items:center;justify-content:center;font-size:18px">🔍</div>
+        <div><div style="font-size:17px;font-weight:800">AI Waste Scanner</div><div style="font-size:12px;color:var(--textMid);margin-top:2px">AI identifies & classifies waste</div></div>
+      </div>
+      <div id="m-err-bar" style="display:none;background:var(--dangerDim);border:1px solid rgba(255,61,61,.3);border-radius:10px;padding:11px 14px;font-size:13px;color:var(--danger);margin-bottom:12px"></div>
+      <!-- idle -->
+      <div id="m-idle">
+      <!-- API KEY BOX -->
+      <div id="api-key-box" style="background:#0A1F10;border:1px solid rgba(0,230,118,.3);border-radius:12px;padding:14px 16px;margin-bottom:14px">
+        <div style="font-size:11px;font-weight:700;color:#00E676;font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">🔑 Anthropic API Key (required for AI scanning)</div>
+        <input id="api-key-input" type="password" placeholder="sk-ant-api03-..." autocomplete="off" style="width:100%;background:#07100A;border:1px solid var(--border2);border-radius:8px;padding:10px 12px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none"/>
+        <div style="font-size:11px;color:var(--textDim);margin-top:7px;line-height:1.5">Your key stays on your device and is never stored. Get one free at <span style="color:var(--accent)">console.anthropic.com</span></div>
+      </div>
+        <button class="scan-act-btn" onclick="camOpen()" style="width:100%;flex-direction:row;gap:14px;border-color:var(--accent);background:linear-gradient(135deg,#041A0C,#072E14);box-shadow:0 0 20px rgba(0,230,118,.15);margin-bottom:10px">
+          <div class="s-icon-box" style="background:var(--accent)">📷</div>
+          <div style="text-align:left;flex:1"><div style="font-size:17px;font-weight:900;color:var(--accent)">Take a Photo</div><div style="font-size:12px;color:var(--textMid);margin-top:2px">Open live camera viewfinder</div></div>
+          <div style="font-size:22px;color:var(--accent)">›</div>
+        </button>
+        <label class="scan-act-btn" style="width:100%;flex-direction:row;gap:14px;border-color:var(--blue);background:linear-gradient(135deg,#041420,#071E30);box-shadow:0 0 20px rgba(41,182,246,.12);margin-bottom:14px;display:flex;align-items:center;cursor:pointer">
+          <div class="s-icon-box" style="background:var(--blue)">🖼️</div>
+          <div style="text-align:left;flex:1"><div style="font-size:17px;font-weight:900;color:var(--blue)">Upload from Gallery</div><div style="font-size:12px;color:var(--textMid);margin-top:2px">Choose an existing photo</div></div>
+          <div style="font-size:22px;color:var(--blue)">›</div>
+          <input type="file" accept="image/*" onchange="galHandle(event)" style="display:none"/>
+        </label>
+        <div class="panel panel-pad" style="display:flex;gap:10px;align-items:flex-start;margin-bottom:14px">
+          <span style="font-size:18px">🤖</span>
+          <div style="font-size:12px;color:var(--textMid);line-height:1.6">Vision AI identifies the <strong style="color:var(--text)">exact item</strong>, estimates weight, classifies waste type and gives BBMP Bengaluru disposal instructions</div>
+        </div>
+        <div class="panel panel-pad" style="margin-bottom:14px">
+          <div class="slabel">Try a demo scan</div>
+          <div class="demo-grid">
+            <button class="demo-btn" onclick="runDemo('pizza')">🍕 Pizza Box</button>
+            <button class="demo-btn" onclick="runDemo('battery')">🔋 AA Battery</button>
+            <button class="demo-btn" onclick="runDemo('plastic')">♻️ Plastic Bottle</button>
+            <button class="demo-btn" onclick="runDemo('food')">🥗 Food Scraps</button>
+          </div>
+        </div>
+        <div class="slabel">Recent Community Scans</div>
+        <div class="panel" id="m-recent-list"></div>
+      </div>
+      <!-- camera -->
+      <div id="m-camera" style="display:none">
+        <div class="cam-wrap">
+          <video id="cam-vid" autoplay playsinline muted></video>
+          <div class="cam-ov">
+            <div class="cam-corner" style="top:12px;left:12px;border-width:3px 0 0 3px;border-radius:3px 0 0 0"></div>
+            <div class="cam-corner" style="top:12px;right:12px;border-width:3px 3px 0 0;border-radius:0 3px 0 0"></div>
+            <div style="display:flex;justify-content:space-between">
+              <button class="cam-btn" onclick="camClose()">✕</button>
+              <button class="cam-btn" onclick="camFlip()">🔄</button>
+            </div>
+            <div style="text-align:center;font-size:11px;color:rgba(255,255,255,.6);letter-spacing:.5px">Point camera at the waste item</div>
+            <div>
+              <div class="cam-corner" style="bottom:72px;left:12px;border-width:0 0 3px 3px;border-radius:0 0 0 3px"></div>
+              <div class="cam-corner" style="bottom:72px;right:12px;border-width:0 3px 3px 0;border-radius:0 0 3px 0"></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:4px">
+                <label class="cam-btn" style="cursor:pointer">🖼️<input type="file" accept="image/*" onchange="galHandle(event)" style="display:none"/></label>
+                <button class="shutter" onclick="camCapture()"><div class="shutter-in"></div></button>
+                <div style="width:42px"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="cam-err-box"></div>
+      </div>
+      <!-- scanning -->
+      <div id="m-scanning" style="display:none">
+        <div class="panel panel-pad" style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:28px 20px">
+          <img id="scan-prev" style="width:100px;height:100px;border-radius:12px;object-fit:cover;border:2px solid rgba(0,230,118,.35);display:none" alt="preview"/>
+          <div id="scan-icon-box" style="width:68px;height:68px;border-radius:20px;background:var(--accentGlow);display:flex;align-items:center;justify-content:center;font-size:30px">🧠</div>
+          <div style="width:100%;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;justify-content:space-between;font-size:13px">
+              <span style="color:var(--textMid)">Analyzing with AI…</span>
+              <span id="scan-pct" style="color:var(--accent);font-family:var(--mono)">0%</span>
+            </div>
+            <div class="prog-track"><div id="scan-bar" class="prog-fill" style="width:0%"></div></div>
+            <div id="scan-lbl" style="font-size:12px;color:var(--textDim)">🔍 Sending image…</div>
+          </div>
+        </div>
+      </div>
+      <!-- result -->
+      <div id="m-result" style="display:none">
+        <div class="type-banner" id="r-banner">
+          <div id="r-detected" style="font-size:11px;font-weight:700;font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;opacity:.65"></div>
+          <div class="type-big" id="r-type"></div>
+          <div class="bin-pill" id="r-bin"></div>
+        </div>
+        <div class="res-panel">
+          <div class="res-row">
+            <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0" id="r-dot"></div>
+            <div style="font-size:14px;font-weight:700;flex:1" id="r-item"></div>
+            <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--accent)" id="r-conf"></div>
+          </div>
+          <div id="r-contam" style="display:flex;align-items:center;gap:10px;padding:12px 16px"></div>
+        </div>
+        <div class="res-panel">
+          <div class="qty-grid">
+            <div class="qty-cell" style="border-right:1px solid var(--border)"><div class="qty-lbl">⚖️ Weight</div><div class="qty-val" id="q-wt" style="color:var(--accent)">—</div></div>
+            <div class="qty-cell" style="border-right:1px solid var(--border)"><div class="qty-lbl">📦 Volume</div><div class="qty-val" id="q-vol" style="color:var(--blue)">—</div></div>
+            <div class="qty-cell"><div class="qty-lbl">🔢 Count</div><div class="qty-val" id="q-cnt" style="color:var(--warn)">—</div></div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 16px;border-top:1px solid var(--border)">
+            <div><div style="font-size:12px;color:var(--textMid)">How many items?</div></div>
+            <div style="display:flex;align-items:center;border:1px solid var(--border);border-radius:10px;overflow:hidden">
+              <button class="step-btn" onclick="changeQty(-1)" style="border-radius:0;border:none;width:38px;height:38px">−</button>
+              <div style="width:42px;text-align:center;font-size:16px;font-weight:900;color:var(--accent);font-family:var(--mono)" id="q-mul">1</div>
+              <button class="step-btn" onclick="changeQty(1)" style="border-radius:0;border:none;width:38px;height:38px">+</button>
+            </div>
+          </div>
+          <div id="co2-row" style="padding:10px 16px 14px;display:flex;align-items:center;gap:8px;background:rgba(0,230,118,.05);border-top:1px solid var(--border)">
+            <span>🌱</span><div id="co2-txt" style="font-size:12px;color:var(--textMid);line-height:1.5"></div>
+          </div>
+          <div id="mat-row" style="padding:10px 16px;border-top:1px solid var(--border);display:flex;gap:7px;flex-wrap:wrap"></div>
+        </div>
+        <div class="res-panel">
+          <div class="res-tabs">
+            <button class="res-tab active" onclick="switchTab('advice',this)">💡 Advice</button>
+            <button class="res-tab" onclick="switchTab('steps',this)">📋 Steps</button>
+            <button class="res-tab" onclick="switchTab('details',this)">🧪 Details</button>
+          </div>
+          <div class="tab-body active" id="tab-advice"></div>
+          <div class="tab-body" id="tab-steps"></div>
+          <div class="tab-body" id="tab-details"></div>
+        </div>
+        <button onclick="scanReset()" style="width:100%;padding:13px;border-radius:var(--r);background:var(--accentGlow);border:1px solid rgba(0,230,118,.25);color:var(--accent);font-size:14px;font-weight:800;cursor:pointer;margin-top:4px;font-family:var(--sans)">↩ Scan Another Item</button>
+      </div>
+    </div>
+
+    <!-- GUIDE PAGE -->
+    <div class="m-page" id="mp-guide">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+        <div style="width:40px;height:40px;border-radius:11px;background:var(--blueDim);display:flex;align-items:center;justify-content:center;font-size:18px">📋</div>
+        <div><div style="font-size:17px;font-weight:800">Segregation Guide</div><div style="font-size:12px;color:var(--textMid);margin-top:2px">BBMP-compliant waste categories</div></div>
+      </div>
+      <div class="guide-grid">
+        <div class="guide-card" style="background:#041420;border-color:rgba(41,182,246,.2)">
+          <div style="font-size:24px;margin-bottom:6px">🥬</div>
+          <div style="font-size:13px;font-weight:800;color:var(--wet)">Wet Waste</div>
+          <div style="font-size:10px;color:var(--textMid);margin-bottom:7px">🟢 Green Bin</div>
+          <div style="font-size:11px;color:var(--text);line-height:1.7">Vegetable & fruit peels<br>Cooked food waste<br>Tea bags, coffee grounds<br>Flowers and leaves</div>
+          <div style="background:rgba(41,182,246,.07);border-left:3px solid var(--wet);border-radius:4px;padding:7px 9px;margin-top:9px;font-size:11px;color:var(--wet);line-height:1.5">💡 Drain excess liquid first</div>
+        </div>
+        <div class="guide-card" style="background:#041808;border-color:rgba(0,230,118,.2)">
+          <div style="font-size:24px;margin-bottom:6px">📦</div>
+          <div style="font-size:13px;font-weight:800;color:var(--dry)">Dry Waste</div>
+          <div style="font-size:10px;color:var(--textMid);margin-bottom:7px">🔵 Blue Bin</div>
+          <div style="font-size:11px;color:var(--text);line-height:1.7">Paper, cardboard (clean)<br>Plastic bottles, cans<br>Glass bottles<br>Clothes, shoes</div>
+          <div style="background:rgba(0,230,118,.07);border-left:3px solid var(--dry);border-radius:4px;padding:7px 9px;margin-top:9px;font-size:11px;color:var(--dry);line-height:1.5">💡 Rinse containers before disposal</div>
+        </div>
+        <div class="guide-card" style="background:#180F00;border-color:rgba(255,179,0,.2)">
+          <div style="font-size:24px;margin-bottom:6px">⚗️</div>
+          <div style="font-size:13px;font-weight:800;color:var(--haz)">Hazardous</div>
+          <div style="font-size:10px;color:var(--textMid);margin-bottom:7px">🔴 Red Bin</div>
+          <div style="font-size:11px;color:var(--text);line-height:1.7">Batteries, e-waste<br>Medicines, paints<br>Pesticides, solvents<br>CFL bulbs</div>
+          <div style="background:rgba(255,179,0,.07);border-left:3px solid var(--haz);border-radius:4px;padding:7px 9px;margin-top:9px;font-size:11px;color:var(--haz);line-height:1.5">💡 Never mix with other waste</div>
+        </div>
+        <div class="guide-card" style="background:#180410;border-color:rgba(255,128,171,.2)">
+          <div style="font-size:24px;margin-bottom:6px">🩺</div>
+          <div style="font-size:13px;font-weight:800;color:var(--san)">Sanitary</div>
+          <div style="font-size:10px;color:var(--textMid);margin-bottom:7px">🟡 Yellow Bin</div>
+          <div style="font-size:11px;color:var(--text);line-height:1.7">Sanitary pads, diapers<br>Bandages, cotton swabs<br>Tissue paper<br>Disposable masks</div>
+          <div style="background:rgba(255,128,171,.07);border-left:3px solid var(--san);border-radius:4px;padding:7px 9px;margin-top:9px;font-size:11px;color:var(--san);line-height:1.5">💡 Wrap securely before disposal</div>
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <div class="slabel">BBMP Contacts</div>
+        <div class="panel panel-pad">
+          <div style="display:flex;justify-content:space-between;padding-bottom:9px;border-bottom:1px solid var(--border);margin-bottom:9px"><span style="font-size:13px;color:var(--textMid)">SWM Helpline</span><span style="font-size:13px;font-weight:700;color:var(--accent);font-family:var(--mono)">080-22660000</span></div>
+          <div style="display:flex;justify-content:space-between;padding-bottom:9px;border-bottom:1px solid var(--border);margin-bottom:9px"><span style="font-size:13px;color:var(--textMid)">E-Waste (KSPCB)</span><span style="font-size:13px;font-weight:700;color:var(--blue);font-family:var(--mono)">1800-425-1573</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="font-size:13px;color:var(--textMid)">Missed Pickup</span><span style="font-size:13px;font-weight:700;color:var(--warn)">BBMP Sahaaya App</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MY WARD PAGE -->
+    <div class="m-page" id="mp-ward">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+        <div style="width:40px;height:40px;border-radius:11px;background:var(--warnDim);display:flex;align-items:center;justify-content:center;font-size:18px">📍</div>
+        <div><div style="font-size:17px;font-weight:800">My Ward</div><div style="font-size:12px;color:var(--textMid);margin-top:2px">Compliance score & statistics</div></div>
+      </div>
+      <select class="ward-sel" id="ward-sel" onchange="renderMyWard(this.value)">
+        <option value="">Select your ward…</option>
+      </select>
+      <div id="ward-body" style="display:none">
+        <div class="panel panel-pad" style="text-align:center;margin-bottom:14px">
+          <svg id="ring-svg" width="96" height="96" style="transform:rotate(-90deg)" viewBox="0 0 96 96">
+            <circle cx="48" cy="48" r="40" fill="none" stroke="var(--border)" stroke-width="7"/>
+            <circle id="ring-arc" cx="48" cy="48" r="40" fill="none" stroke-width="7" stroke-linecap="round" stroke-dasharray="0 251"/>
+          </svg>
+          <div id="ring-lbl" style="font-size:26px;font-weight:900;font-family:var(--mono);margin-top:-6px"></div>
+          <div id="ward-nm" style="font-size:14px;font-weight:700;margin-top:3px"></div>
+          <div id="hotspot-tag" style="display:none;margin-top:7px;align-items:center;gap:6px;justify-content:center">
+            <div class="hot-dot"></div><span style="font-size:12px;font-weight:700;color:var(--danger)">Active Hotspot</span>
+          </div>
+        </div>
+        <div class="stat-grid2" style="margin-bottom:14px">
+          <div class="stat-tile"><div style="font-size:22px;font-weight:900;font-family:var(--mono);color:var(--blue)" id="sw-scans">—</div><div style="font-size:10px;color:var(--textDim);margin-top:3px;font-family:var(--mono);text-transform:uppercase;letter-spacing:1px">Total Scans</div></div>
+          <div class="stat-tile"><div style="font-size:22px;font-weight:900;font-family:var(--mono);color:var(--wet)" id="sw-wet">—</div><div style="font-size:10px;color:var(--textDim);margin-top:3px;font-family:var(--mono);text-transform:uppercase;letter-spacing:1px">Wet Waste</div></div>
+          <div class="stat-tile"><div style="font-size:22px;font-weight:900;font-family:var(--mono);color:var(--dry)" id="sw-dry">—</div><div style="font-size:10px;color:var(--textDim);margin-top:3px;font-family:var(--mono);text-transform:uppercase;letter-spacing:1px">Dry Waste</div></div>
+          <div class="stat-tile"><div style="font-size:22px;font-weight:900;font-family:var(--mono);color:var(--haz)" id="sw-haz">—</div><div style="font-size:10px;color:var(--textDim);margin-top:3px;font-family:var(--mono);text-transform:uppercase;letter-spacing:1px">Hazardous</div></div>
+        </div>
+        <div class="slabel">Improvement Tips</div>
+        <div class="panel" id="ward-tips"></div>
+      </div>
+    </div>
+
+    <!-- RECYCLE PAGE -->
+    <div class="m-page" id="mp-recycle">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+        <div style="width:40px;height:40px;border-radius:11px;background:var(--accentGlow);display:flex;align-items:center;justify-content:center;font-size:18px">♻️</div>
+        <div><div style="font-size:17px;font-weight:800">Reduce & Recycle</div><div style="font-size:12px;color:var(--textMid);margin-top:2px">BBMP action plan for Bengaluru</div></div>
+      </div>
+      <div class="metric-grid2">
+        <div class="metric-tile"><div style="font-size:10px;color:var(--textMid);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Daily Generated</div><div style="font-size:19px;font-weight:900;color:var(--danger);font-family:var(--mono)">5,500 TPD</div><div style="font-size:11px;color:var(--textDim);margin-top:2px">↑ 3% YoY</div></div>
+        <div class="metric-tile"><div style="font-size:10px;color:var(--textMid);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Recycled</div><div style="font-size:19px;font-weight:900;color:var(--accent);font-family:var(--mono)">1,200 TPD</div><div style="font-size:11px;color:var(--textDim);margin-top:2px">↑ 12% YoY</div></div>
+        <div class="metric-tile"><div style="font-size:10px;color:var(--textMid);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Composted</div><div style="font-size:19px;font-weight:900;color:var(--wet);font-family:var(--mono)">600 TPD</div><div style="font-size:11px;color:var(--textDim);margin-top:2px">↑ 8% YoY</div></div>
+        <div class="metric-tile"><div style="font-size:10px;color:var(--textMid);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">To Landfill</div><div style="font-size:19px;font-weight:900;color:var(--warn);font-family:var(--mono)">3,700 TPD</div><div style="font-size:11px;color:var(--textDim);margin-top:2px">↓ 5% target</div></div>
+      </div>
+      <div class="slabel">BBMP Infrastructure</div>
+      <div id="ini-list"></div>
+      <div style="margin-top:14px"><div class="slabel">Authorised Recyclers & Partners</div><div class="panel" id="recycler-list"></div></div>
+    </div>
+
+  </div><!-- /mobile-content -->
+  <!-- Mobile bottom nav -->
+  <div id="mobile-botnav">
+    <button class="m-nav-btn active" id="mn-scanner" onclick="setMobileTab('scanner',this)"><span class="m-nav-icon">🔍</span><span class="m-nav-label">Scanner</span></button>
+    <button class="m-nav-btn" id="mn-guide" onclick="setMobileTab('guide',this)"><span class="m-nav-icon">📋</span><span class="m-nav-label">Guide</span></button>
+    <button class="m-nav-btn" id="mn-ward" onclick="setMobileTab('ward',this)"><span class="m-nav-icon">📍</span><span class="m-nav-label">My Ward</span></button>
+    <button class="m-nav-btn" id="mn-recycle" onclick="setMobileTab('recycle',this)"><span class="m-nav-icon">♻️</span><span class="m-nav-label">Recycle</span></button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════
+     DESKTOP AUTHORITY APP
+════════════════════════════════════ -->
+<div id="desktop-app">
+  <div id="desk-body">
+    <!-- SIDEBAR -->
+    <div id="sidebar">
+      <div class="sidebar-sect">Navigation</div>
+      <div class="nav-item active" id="nav-overview" onclick="setDeskPage('overview',this)"><span class="nav-icon">📊</span>Overview</div>
+      <div class="nav-item" id="nav-wards" onclick="setDeskPage('wards',this)"><span class="nav-icon">🗺️</span>Ward Monitor</div>
+      <div class="nav-item" id="nav-analytics" onclick="setDeskPage('analytics',this)"><span class="nav-icon">📈</span>Analytics</div>
+      <div class="nav-item" id="nav-alerts" onclick="setDeskPage('alerts',this)"><span class="nav-icon">🚨</span>Alerts</div>
+      <div class="nav-item" id="nav-feed" onclick="setDeskPage('feed',this)"><span class="nav-icon">📡</span>Live Feed</div>
+      <div class="nav-item" id="nav-prediction" onclick="setDeskPage('prediction',this)"><span class="nav-icon">🔮</span>Predictions</div>
+      <div class="nav-item" id="nav-scanner" onclick="setDeskPage('scanner',this)"><span class="nav-icon">🔍</span>AI Scanner</div>
+      <div class="nav-item" id="nav-recycle2" onclick="setDeskPage('recycle2',this)"><span class="nav-icon">♻️</span>Reduce & Recycle</div>
+      <div class="sidebar-div"></div>
+      <div class="sidebar-sect">Wards</div>
+      <div id="ward-list"></div>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="desk-main">
+
+      <!-- OVERVIEW -->
+      <div class="d-page active" id="dp-overview">
+        <div class="kpi-grid5">
+          <div class="kpi-card"><div class="kpi-bg">🔍</div><div class="kpi-icon">🔍</div><div class="kpi-val" style="color:var(--blue)">29.2K</div><div class="kpi-lbl">Total Scans</div><div class="kpi-sub">This week · All wards</div></div>
+          <div class="kpi-card"><div class="kpi-bg">⭐</div><div class="kpi-icon">⭐</div><div class="kpi-val score-fair">76%</div><div class="kpi-lbl">City Avg Score</div><div class="kpi-sub">Compliance rate</div></div>
+          <div class="kpi-card"><div class="kpi-bg">🔴</div><div class="kpi-icon">🔴</div><div class="kpi-val score-poor">4</div><div class="kpi-lbl">Active Hotspots</div><div class="kpi-sub">Wards flagged</div></div>
+          <div class="kpi-card"><div class="kpi-bg">⚖️</div><div class="kpi-icon">⚖️</div><div class="kpi-val" style="color:var(--warn)">5,500T</div><div class="kpi-lbl">Daily Generated</div><div class="kpi-sub">Tonnes per day</div></div>
+          <div class="kpi-card"><div class="kpi-bg">♻️</div><div class="kpi-icon">♻️</div><div class="kpi-val score-good">1,240T</div><div class="kpi-lbl">Recycled Today</div><div class="kpi-sub">↑ 8% vs yesterday</div></div>
+        </div>
+        <div class="chart-row cr3">
+          <div class="panel panel-pad"><div class="slabel">📈 Today's Scan Volume by Hour</div><div class="chart-h"><canvas id="hourlyChart"></canvas></div></div>
+          <div class="panel panel-pad"><div class="slabel">📊 7-Day Waste Breakdown</div><div class="chart-h"><canvas id="weeklyBar"></canvas></div>
+            <div class="legend-row"><div class="leg-item"><div class="leg-dot" style="background:var(--wet)"></div>Wet</div><div class="leg-item"><div class="leg-dot" style="background:var(--dry)"></div>Dry</div><div class="leg-item"><div class="leg-dot" style="background:var(--haz)"></div>Hazardous</div><div class="leg-item"><div class="leg-dot" style="background:var(--san)"></div>Sanitary</div></div>
+          </div>
+          <div class="panel panel-pad"><div class="slabel">🥧 City Composition</div>
+            <div style="height:150px"><canvas id="pieChart"></canvas></div>
+            <div style="margin-top:10px;display:flex;flex-direction:column;gap:7px">
+              <div style="display:flex;justify-content:space-between;align-items:center"><div class="leg-item"><div class="leg-dot" style="background:var(--wet)"></div>Wet</div><div style="display:flex;align-items:center;gap:7px"><div class="bar-track" style="width:55px"><div class="bar-fill" style="width:100%;background:var(--wet)"></div></div><span style="font-size:11px;font-weight:700;color:var(--wet);font-family:var(--mono)">50%</span></div></div>
+              <div style="display:flex;justify-content:space-between;align-items:center"><div class="leg-item"><div class="leg-dot" style="background:var(--dry)"></div>Dry</div><div style="display:flex;align-items:center;gap:7px"><div class="bar-track" style="width:55px"><div class="bar-fill" style="width:66%;background:var(--dry)"></div></div><span style="font-size:11px;font-weight:700;color:var(--dry);font-family:var(--mono)">33%</span></div></div>
+              <div style="display:flex;justify-content:space-between;align-items:center"><div class="leg-item"><div class="leg-dot" style="background:var(--haz)"></div>Haz</div><div style="display:flex;align-items:center;gap:7px"><div class="bar-track" style="width:55px"><div class="bar-fill" style="width:22%;background:var(--haz)"></div></div><span style="font-size:11px;font-weight:700;color:var(--haz);font-family:var(--mono)">11%</span></div></div>
+              <div style="display:flex;justify-content:space-between;align-items:center"><div class="leg-item"><div class="leg-dot" style="background:var(--san)"></div>San</div><div style="display:flex;align-items:center;gap:7px"><div class="bar-track" style="width:55px"><div class="bar-fill" style="width:12%;background:var(--san)"></div></div><span style="font-size:11px;font-weight:700;color:var(--san);font-family:var(--mono)">6%</span></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="chart-row cr2">
+          <div class="panel panel-pad"><div class="slabel">🗺️ Ward Compliance Scores (Ranked)</div><div class="chart-hl"><canvas id="wardBar"></canvas></div></div>
+          <div class="panel panel-pad"><div class="slabel">📉 8-Week City Compliance Trend</div><div class="chart-hl"><canvas id="trendLine"></canvas></div></div>
+        </div>
+        <div class="panel panel-pad"><div class="slabel">🔴 Active Hotspot Wards</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px" id="hotspot-grid"></div></div>
+      </div>
+
+      <!-- WARD MONITOR -->
+      <div class="d-page" id="dp-wards">
+        <div style="display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start">
+          <div>
+            <div class="slabel" style="margin-bottom:14px">🗺️ All Wards — Click to Inspect</div>
+            <div class="panel tbl-wrap">
+              <table class="tbl">
+                <thead><tr><th>Ward</th><th>Score</th><th>Scans</th><th>Wet%</th><th>Dry%</th><th>Haz%</th><th>Trend</th><th>Status</th></tr></thead>
+                <tbody id="ward-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+          <div>
+            <div id="ward-drilldown-placeholder" class="panel panel-pad" style="text-align:center;padding:40px 20px"><div style="font-size:36px;margin-bottom:12px">👈</div><div style="font-size:14px;font-weight:600;color:var(--textMid)">Select a ward</div><div style="font-size:12px;color:var(--textDim);margin-top:6px">Click any row for full drilldown</div></div>
+            <div id="ward-drilldown" style="display:none" class="panel panel-pad slide-in"><div id="drilldown-card"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ANALYTICS -->
+      <div class="d-page" id="dp-analytics">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px">
+          <div class="panel panel-pad" style="border-color:rgba(0,230,118,.3);background:rgba(0,230,118,.05)"><div style="font-size:48px;font-weight:900;color:var(--accent);font-family:var(--mono);line-height:1">3</div><div style="font-size:14px;font-weight:600;color:var(--textMid);margin-top:6px">Excellent Wards</div><div style="font-size:11px;color:var(--textDim);margin-top:2px">Score ≥ 85%</div></div>
+          <div class="panel panel-pad" style="border-color:rgba(255,179,0,.3);background:rgba(255,179,0,.05)"><div style="font-size:48px;font-weight:900;color:var(--warn);font-family:var(--mono);line-height:1">3</div><div style="font-size:14px;font-weight:600;color:var(--textMid);margin-top:6px">Fair Wards</div><div style="font-size:11px;color:var(--textDim);margin-top:2px">Score 70–84%</div></div>
+          <div class="panel panel-pad" style="border-color:rgba(255,61,61,.3);background:rgba(255,61,61,.05)"><div style="font-size:48px;font-weight:900;color:var(--danger);font-family:var(--mono);line-height:1">4</div><div style="font-size:14px;font-weight:600;color:var(--textMid);margin-top:6px">Poor Wards</div><div style="font-size:11px;color:var(--textDim);margin-top:2px">Score &lt; 70%</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:22px">
+          <div class="panel panel-pad"><div class="slabel" style="color:var(--accent)">🏆 Top 5 Performing Wards</div><div id="top5-list"></div></div>
+          <div class="panel panel-pad"><div class="slabel" style="color:var(--danger)">⚠️ Bottom 5 Wards</div><div id="bot5-list"></div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+          <div class="panel panel-pad"><div class="slabel">🧪 Contamination Rate by Ward</div><div style="height:200px"><canvas id="contamChart"></canvas></div></div>
+          <div class="panel panel-pad"><div class="slabel">📦 Scan Volume by Ward</div><div style="height:200px"><canvas id="scanVolChart"></canvas></div></div>
+        </div>
+      </div>
+
+      <!-- ALERTS -->
+      <div class="d-page" id="dp-alerts">
+        <div style="display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start">
+          <div>
+            <div class="slabel" style="color:var(--danger);margin-bottom:14px">🔴 Critical Hotspot Alerts — 4 Active</div>
+            <div id="alert-cards"></div>
+            <div class="slabel" style="color:var(--warn);margin-top:20px;margin-bottom:12px">🟡 Warning Wards (Score 65–80%)</div>
+            <div id="warn-cards"></div>
+            <div class="slabel" style="color:var(--accent);margin-top:20px;margin-bottom:12px">✅ Performing Well (Score ≥ 85%)</div>
+            <div id="good-cards"></div>
+          </div>
+          <div>
+            <div class="panel panel-pad"><div class="slabel">📋 Recommended Actions</div><div id="action-list"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LIVE FEED -->
+      <div class="d-page" id="dp-feed">
+        <div style="display:grid;grid-template-columns:1fr 290px;gap:20px;align-items:start">
+          <div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px"><div class="live-dot"></div><div class="slabel" style="margin-bottom:0">📡 Live Scan Feed — Real-time</div></div>
+            <div class="panel">
+              <div class="feed-grid feed-head">
+                <div style="font-size:10px;font-weight:700;color:var(--textDim);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px">Item</div>
+                <div style="font-size:10px;font-weight:700;color:var(--textDim);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px">Ward</div>
+                <div style="font-size:10px;font-weight:700;color:var(--textDim);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px">Category</div>
+                <div style="font-size:10px;font-weight:700;color:var(--textDim);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px">Status</div>
+                <div style="font-size:10px;font-weight:700;color:var(--textDim);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px">Time</div>
+              </div>
+              <div id="feed-rows"></div>
+            </div>
+          </div>
+          <div>
+            <div class="panel panel-pad" style="margin-bottom:14px"><div class="slabel">📊 Feed Summary</div><div id="feed-summary"></div></div>
+            <div class="panel panel-pad"><div class="slabel">🗂 Category Breakdown</div><div style="height:160px"><canvas id="feedPie"></canvas></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PREDICTIONS -->
+      <div class="d-page" id="dp-prediction">
+        <div class="slabel" style="margin-bottom:16px">🔮 Tomorrow's Waste Predictions — All Wards</div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:22px" id="pred-grid"></div>
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:18px">
+          <div class="panel panel-pad"><div class="slabel">📈 Predicted 7-Day Score Trend</div><div style="height:220px"><canvas id="predChart"></canvas></div></div>
+          <div class="panel panel-pad"><div class="slabel">🌱 CO₂ Impact Forecast</div><div id="co2-list"></div></div>
+        </div>
+      </div>
+
+      <!-- AI SCANNER (desktop) -->
+      <div class="d-page" id="dp-scanner">
+        <div class="scan-wrap">
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
+            <div style="width:48px;height:48px;border-radius:14px;background:var(--accentGlow);border:1px solid rgba(0,230,118,.2);display:flex;align-items:center;justify-content:center;font-size:22px">🔍</div>
+            <div><div style="font-size:20px;font-weight:800">AI Waste Scanner</div><div style="font-size:13px;color:var(--textMid);margin-top:2px">Vision AI for BBMP Bengaluru</div></div>
+          </div>
+          <div id="d-err-bar" style="display:none;background:var(--dangerDim);border:1px solid rgba(255,61,61,.3);border-radius:10px;padding:12px 16px;font-size:13px;color:var(--danger);margin-bottom:14px"></div>
+          <!-- idle -->
+          <div id="d-idle">
+          <!-- API KEY BOX (desktop) -->
+          <div style="background:#0A1F10;border:1px solid rgba(0,230,118,.3);border-radius:12px;padding:14px 16px;margin-bottom:14px">
+            <div style="font-size:11px;font-weight:700;color:#00E676;font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">🔑 Anthropic API Key (required for AI scanning)</div>
+            <div style="font-size:11px;color:var(--textDim);margin-top:2px;margin-bottom:8px;line-height:1.5">Enter your key in the Citizen → Scanner tab — it is shared across both views.</div>
+            <div style="font-size:11px;color:var(--textDim);line-height:1.5">Get a free key at <span style="color:var(--accent)">console.anthropic.com</span></div>
+          </div>
+            <div class="scan-actions">
+              <button class="scan-act-btn" onclick="camOpen()" style="border-color:var(--accent);background:rgba(0,230,118,.04)">
+                <div class="s-icon-box" style="background:var(--accent)">📷</div>
+                <div style="font-size:15px;font-weight:800;color:var(--accent)">Take a Photo</div>
+                <div style="font-size:12px;color:var(--textMid)">Open live camera</div>
+              </button>
+              <label class="scan-act-btn" style="border-color:var(--blue);background:rgba(41,182,246,.04);cursor:pointer">
+                <div class="s-icon-box" style="background:var(--blue)">🖼️</div>
+                <div style="font-size:15px;font-weight:800;color:var(--blue)">Upload Photo</div>
+                <div style="font-size:12px;color:var(--textMid)">From device gallery</div>
+                <input type="file" accept="image/*" onchange="galHandle(event)" style="display:none"/>
+              </label>
+            </div>
+            <div class="panel panel-pad" style="display:flex;gap:10px;align-items:flex-start;margin-bottom:14px"><span style="font-size:18px">🤖</span><div style="font-size:12px;color:var(--textMid);line-height:1.6">Vision AI identifies the <strong style="color:var(--text)">exact item</strong>, estimates weight, classifies waste type and gives BBMP disposal instructions</div></div>
+            <div class="panel panel-pad" style="margin-bottom:14px"><div class="slabel">Try a demo scan</div><div class="demo-grid"><button class="demo-btn" onclick="runDemo('pizza')">🍕 Pizza Box</button><button class="demo-btn" onclick="runDemo('battery')">🔋 AA Battery</button><button class="demo-btn" onclick="runDemo('plastic')">♻️ Plastic Bottle</button><button class="demo-btn" onclick="runDemo('food')">🥗 Food Scraps</button></div></div>
+            <div class="panel" style="overflow:hidden"><div class="panel-pad" style="border-bottom:1px solid var(--border)"><div class="slabel" style="margin-bottom:0">Recent Community Scans</div></div><div id="d-recent-list"></div></div>
+          </div>
+          <!-- camera (shared, same #cam-vid) -->
+          <div id="d-camera" style="display:none">
+            <div class="cam-wrap">
+              <video id="cam-vid2" autoplay playsinline muted></video>
+              <div class="cam-ov">
+                <div class="cam-corner" style="top:12px;left:12px;border-width:3px 0 0 3px;border-radius:3px 0 0 0"></div>
+                <div class="cam-corner" style="top:12px;right:12px;border-width:3px 3px 0 0;border-radius:0 3px 0 0"></div>
+                <div style="display:flex;justify-content:space-between"><button class="cam-btn" onclick="camClose()">✕</button><button class="cam-btn" onclick="camFlip()">🔄</button></div>
+                <div style="text-align:center;font-size:11px;color:rgba(255,255,255,.6);letter-spacing:.5px">Point camera at the waste item</div>
+                <div>
+                  <div class="cam-corner" style="bottom:72px;left:12px;border-width:0 0 3px 3px;border-radius:0 0 0 3px"></div>
+                  <div class="cam-corner" style="bottom:72px;right:12px;border-width:0 3px 3px 0;border-radius:0 0 3px 0"></div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:4px">
+                    <label class="cam-btn" style="cursor:pointer">🖼️<input type="file" accept="image/*" onchange="galHandle(event)" style="display:none"/></label>
+                    <button class="shutter" onclick="camCapture()"><div class="shutter-in"></div></button>
+                    <div style="width:42px"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div id="cam-err-box2" style="display:none;background:var(--dangerDim);border:1px solid rgba(255,61,61,.3);border-radius:12px;padding:14px;font-size:13px;color:var(--danger);text-align:center;line-height:1.6;margin-top:10px"></div>
+          </div>
+          <!-- scanning / result reuse mobile elements but in desktop page -->
+          <div id="d-scanning" style="display:none">
+            <div class="panel panel-pad" style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:28px 20px">
+              <img id="scan-prev2" style="width:110px;height:110px;border-radius:14px;object-fit:cover;border:2px solid rgba(0,230,118,.35);display:none" alt="preview"/>
+              <div id="scan-icon-box2" style="width:68px;height:68px;border-radius:20px;background:var(--accentGlow);display:flex;align-items:center;justify-content:center;font-size:30px">🧠</div>
+              <div style="width:100%;display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--textMid)">Analyzing with AI…</span><span id="scan-pct2" style="color:var(--accent);font-family:var(--mono)">0%</span></div>
+                <div class="prog-track"><div id="scan-bar2" class="prog-fill" style="width:0%"></div></div>
+                <div id="scan-lbl2" style="font-size:12px;color:var(--textDim)">🔍 Sending image…</div>
+              </div>
+            </div>
+          </div>
+          <!-- result mirrors mobile, id suffix 2 -->
+          <div id="d-result" style="display:none">
+            <div class="type-banner" id="r-banner2"><div id="r-detected2" style="font-size:11px;font-weight:700;font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;opacity:.65"></div><div class="type-big" id="r-type2"></div><div class="bin-pill" id="r-bin2"></div></div>
+            <div class="res-panel">
+              <div class="res-row"><div style="width:8px;height:8px;border-radius:50%;flex-shrink:0" id="r-dot2"></div><div style="font-size:14px;font-weight:700;flex:1" id="r-item2"></div><div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--accent)" id="r-conf2"></div></div>
+              <div id="r-contam2" style="display:flex;align-items:center;gap:10px;padding:12px 16px"></div>
+            </div>
+            <div class="res-panel">
+              <div class="qty-grid">
+                <div class="qty-cell" style="border-right:1px solid var(--border)"><div class="qty-lbl">⚖️ Weight</div><div class="qty-val" id="q-wt2" style="color:var(--accent)">—</div></div>
+                <div class="qty-cell" style="border-right:1px solid var(--border)"><div class="qty-lbl">📦 Volume</div><div class="qty-val" id="q-vol2" style="color:var(--blue)">—</div></div>
+                <div class="qty-cell"><div class="qty-lbl">🔢 Count</div><div class="qty-val" id="q-cnt2" style="color:var(--warn)">—</div></div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 18px;border-top:1px solid var(--border)">
+                <div style="font-size:12px;color:var(--textMid)">How many items?</div>
+                <div style="display:flex;align-items:center;gap:10px">
+                  <button class="step-btn" onclick="changeQty(-1)">−</button>
+                  <div id="q-mul2" style="font-size:20px;font-weight:900;font-family:var(--mono);color:var(--accent)">×1</div>
+                  <button class="step-btn" onclick="changeQty(1)">+</button>
+                </div>
+              </div>
+              <div id="co2-row2" style="margin:0 18px 14px;background:var(--accentGlow);border:1px solid rgba(0,230,118,.15);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--textMid);text-align:center" id="co2-txt2"></div>
+              <div id="mat-row2" style="padding:10px 18px;border-top:1px solid var(--border);display:flex;gap:7px;flex-wrap:wrap"></div>
+            </div>
+            <div class="res-panel">
+              <div class="res-tabs">
+                <button class="res-tab active" onclick="switchTab2('advice',this)">💡 Advice</button>
+                <button class="res-tab" onclick="switchTab2('steps',this)">📋 Steps</button>
+                <button class="res-tab" onclick="switchTab2('details',this)">🧪 Details</button>
+              </div>
+              <div class="tab-body active" id="tab2-advice"></div>
+              <div class="tab-body" id="tab2-steps"></div>
+              <div class="tab-body" id="tab2-details"></div>
+            </div>
+            <button onclick="scanReset()" style="width:100%;padding:13px;border-radius:var(--r);background:var(--accentGlow);border:1px solid rgba(0,230,118,.25);color:var(--accent);font-size:14px;font-weight:800;cursor:pointer;margin-top:4px;font-family:var(--sans)">↩ Scan Another Item</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- RECYCLE (desktop) -->
+      <div class="d-page" id="dp-recycle2">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:22px">
+          <div style="width:48px;height:48px;border-radius:14px;background:var(--accentGlow);border:1px solid rgba(0,230,118,.2);display:flex;align-items:center;justify-content:center;font-size:22px">♻️</div>
+          <div><div style="font-size:20px;font-weight:800">Reduce & Recycle</div><div style="font-size:13px;color:var(--textMid);margin-top:2px">BBMP action plan for Bengaluru's 5,500 TPD waste challenge</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px">
+          <div class="panel panel-pad"><div style="font-size:10px;color:var(--textMid);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px">Daily Generated</div><div style="font-size:26px;font-weight:900;color:var(--danger);font-family:var(--mono)">5,500T</div><div style="font-size:11px;color:var(--textDim);margin-top:3px">↑ 3% YoY</div></div>
+          <div class="panel panel-pad"><div style="font-size:10px;color:var(--textMid);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px">Recycled</div><div style="font-size:26px;font-weight:900;color:var(--accent);font-family:var(--mono)">1,200T</div><div style="font-size:11px;color:var(--textDim);margin-top:3px">↑ 12% YoY</div></div>
+          <div class="panel panel-pad"><div style="font-size:10px;color:var(--textMid);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px">Composted Daily</div><div style="font-size:26px;font-weight:900;color:var(--wet);font-family:var(--mono)">600T</div><div style="font-size:11px;color:var(--textDim);margin-top:3px">↑ 8% YoY</div></div>
+          <div class="panel panel-pad"><div style="font-size:10px;color:var(--textMid);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px">To Landfill (Mandur)</div><div style="font-size:26px;font-weight:900;color:var(--warn);font-family:var(--mono)">3,700T</div><div style="font-size:11px;color:var(--textDim);margin-top:3px">↓ 5% target</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:22px">
+          <div>
+            <div class="slabel">BBMP Infrastructure</div>
+            <div id="ini-list2"></div>
+          </div>
+          <div>
+            <div class="slabel">Authorised Recyclers & Partners</div>
+            <div class="panel panel-pad" id="recycler-list2"></div>
+            <div class="panel panel-pad" style="margin-top:14px">
+              <div class="slabel">BBMP Contacts</div>
+              <div style="display:flex;justify-content:space-between;padding-bottom:9px;border-bottom:1px solid var(--border);margin-bottom:9px"><span style="font-size:13px;color:var(--textMid)">SWM Helpline</span><span style="font-size:13px;font-weight:700;color:var(--accent);font-family:var(--mono)">080-22660000</span></div>
+              <div style="display:flex;justify-content:space-between;padding-bottom:9px;border-bottom:1px solid var(--border);margin-bottom:9px"><span style="font-size:13px;color:var(--textMid)">E-Waste (KSPCB)</span><span style="font-size:13px;font-weight:700;color:var(--blue);font-family:var(--mono)">1800-425-1573</span></div>
+              <div style="display:flex;justify-content:space-between"><span style="font-size:13px;color:var(--textMid)">Bulk Waste Email</span><span style="font-size:13px;font-weight:700;color:var(--warn)"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="492b2b24392c272e2e092e24282025672a2624">[email&#160;protected]</a></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /desk-main -->
+  </div><!-- /desk-body -->
+</div><!-- /desktop-app -->
+
+</div><!-- /shell -->
+<canvas id="cam-canvas" style="display:none"></canvas>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script>
+<script src="app.js" defer></script>
+</body>
+</html>
